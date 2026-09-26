@@ -3,6 +3,8 @@
 **Evolutionary CI/CD for operational AI agents.**
 HarnessForge continuously hardens an AI agent by turning its production failures into measurable harness improvements, without retraining the model or hand-editing the application.
 
+**Live dashboard:** https://harnessforge-one.vercel.app (support-operations run, read live from MongoDB Atlas) · [MongoDB-agent run](https://harnessforge-one.vercel.app/?run=498f57fc13)
+
 ```
 Failures become tests.
 Harness changes become commits.
