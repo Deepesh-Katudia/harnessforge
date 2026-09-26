@@ -10,8 +10,13 @@ export async function GET(req: Request) {
   const requested = new URL(req.url).searchParams.get("run");
   try {
     const db = await hfDb();
-    const runFilter = requested && RUN_ID_RE.test(requested) ? { run_id: requested } : {};
-    const run = await db.collection("runs").findOne(runFilter, { sort: { started_at: -1 }, projection: { _id: 0 } });
+    // Explicit ?run= wins; otherwise the pinned DEFAULT_RUN_ID; otherwise the most recent run.
+    const pinned = process.env.DEFAULT_RUN_ID;
+    const target = requested && RUN_ID_RE.test(requested) ? requested
+      : pinned && RUN_ID_RE.test(pinned) ? pinned : null;
+    const sortLatest = { sort: { started_at: -1 as const }, projection: { _id: 0 } };
+    const run = (target ? await db.collection("runs").findOne({ run_id: target }, sortLatest) : null)
+      ?? await db.collection("runs").findOne({}, sortLatest);
     if (!run) {
       const empty: StatePayload = { run: null, runs: [], genomes: [], events: [], spotlight: null,
         counts: { trajectories: 0, embedded: 0, lessons: 0 } };
