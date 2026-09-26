@@ -89,8 +89,8 @@ def propose(genome: dict, train_metrics: dict, run_id: str, generation: int, his
     messages = [{"role": "system", "content": _system_prompt()},
                 {"role": "user", "content": build_context(genome, train_metrics, retrieved, lessons, history)}]
     cost, last_error = 0.0, None
-    for _ in range(2):
-        comp = llm.chat(config.META_MODEL, messages, temperature=0.3, max_tokens=2500)
+    for json_mode in (True, False, False):  # JSON mode on this route occasionally returns empty content
+        comp = llm.chat(config.META_MODEL, messages, temperature=0.3, max_tokens=2500, json_mode=json_mode)
         cost += comp.cost_usd
         try:
             out = llm.parse_json(comp.text)
