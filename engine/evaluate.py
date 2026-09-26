@@ -39,7 +39,7 @@ def score(task: dict, outcome: dict, gold_rows: list | None) -> tuple[bool, str]
     if family == "diagnose":
         if action != "diagnose":
             return False, f"expected a diagnosis, got action={action}"
-        if "explain_aggregate" not in {c["tool"] for c in outcome.get("tool_calls", [])}:
+        if "explain_aggregate" not in {c["tool"] for c in outcome.get("tool_calls", []) if c.get("ok")}:
             return False, "recommended an index without running explain"
         return scorer.score_diagnosis(outcome.get("diagnosis"), task["gold_diagnosis"])
     if action != "answer":

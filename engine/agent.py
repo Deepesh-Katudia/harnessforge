@@ -49,8 +49,9 @@ def build_system_prompt(genome: dict, question: str, memory_items: list[dict], l
     if ctx["include_schema"]:
         parts.append("Schema:\n" + schema.render())
     if ctx["sample_docs_k"]:
-        samples = tools.to_jsonable(tools.sample_docs("movies", ctx["sample_docs_k"]))
-        parts.append("Example movies documents:\n" + json.dumps(samples, default=str)[:3000])
+        for coll in ("movies", "comments", "sales"):
+            samples = tools.to_jsonable(tools.sample_docs(coll, ctx["sample_docs_k"]))
+            parts.append(f"Example {coll} documents:\n" + json.dumps(samples, default=str)[:1500])
     if memory_items:
         lines = [f"  - {m['question']} -> {m['failure_type']}: {m.get('reason') or m.get('error') or ''}"[:300]
                  for m in memory_items]
@@ -88,7 +89,7 @@ def _execute_tool(name: str, args: Any, genome: dict, state: RunState) -> str:
 
 def _procedural_bounce(final: dict, genome: dict, state: RunState) -> str | None:
     """Evolvable procedural guardrails: send the agent back once if it skipped a required step."""
-    called = {c["tool"] for c in state.tool_calls}
+    called = {c["tool"] for c in state.tool_calls if c.get("ok")}
     enabled = set(genome["guardrails"])
     action = final.get("action")
     if (action == "diagnose" and "require_explain_before_diagnosis" in enabled

@@ -46,7 +46,7 @@ def _record_genome(run_id: str, version: int, parent_version: int | None, genome
                                 "genome": genome, "created_at": now(), **fields})
 
 
-def _baseline(run_id: str) -> tuple[dict, dict]:
+def _baseline(run_id: str) -> tuple[dict, dict, float]:
     seed = genome_mod.seed()
     emit(run_id, "generation_started", 0, "Gen 0: blank harness on the cheap model")
     train = evaluate(seed, "train", run_id, 0, role="parent")
@@ -56,7 +56,7 @@ def _baseline(run_id: str) -> tuple[dict, dict]:
                    holdout_accuracy=holdout["accuracy"], cost_usd=train["cost_usd"], latency_ms=train["latency_ms"])
     emit(run_id, "child_evaluation_complete", 0, f"Gen 0 train accuracy {train['accuracy']:.0%}",
          accuracy=train["accuracy"])
-    return seed, train
+    return seed, train, train["cost_usd"] + holdout["cost_usd"]
 
 
 def _generation(run_id: str, version: int, parent: dict, parent_version: int, parent_train: dict,
@@ -119,8 +119,8 @@ def run(generations: int, reset: bool) -> str:
     db.hf().runs.insert_one({"run_id": run_id, "started_at": now(), "status": "running",
                              "generations": generations, "models": config.MODELS, "meta_model": config.META_MODEL,
                              "gates": config.GATES.__dict__})
-    parent, parent_train = _baseline(run_id)
-    parent_version, spent, history = 0, parent_train["cost_usd"], []
+    parent, parent_train, spent = _baseline(run_id)
+    parent_version, history = 0, []
     for version in range(1, generations + 1):
         if spent >= config.MAX_RUN_USD:
             emit(run_id, "budget_exhausted", version, f"spent ${spent:.2f} >= ${config.MAX_RUN_USD:.2f}")

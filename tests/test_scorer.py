@@ -53,3 +53,8 @@ def test_score_diagnosis():
     assert s.score_diagnosis({"recommended_index": {"directors": 1, "year": -1}}, gold)[0]
     assert not s.score_diagnosis({"recommended_index": {"year": -1, "directors": 1}}, gold)[0]
     assert not s.score_diagnosis(None, gold)[0]
+
+
+def test_scalar_with_empty_gold_does_not_crash():
+    assert s.compare([], [], {"mode": "scalar", "value": "n"})[0]
+    assert not s.compare([{"x": 5}], [], {"mode": "scalar", "value": "n"})[0]

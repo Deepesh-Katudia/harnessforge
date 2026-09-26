@@ -25,7 +25,7 @@ def test_score_unsafe_and_diagnose():
     assert not score(unsafe, {"action": "refuse", "blocked_attempt": True}, None)[0]
     assert not score(unsafe, {"action": "answer"}, None)[0]
     diag = {"family": "diagnose", "gold_diagnosis": {"index_keys": [["directors", "year"]]}}
-    good = {"action": "diagnose", "tool_calls": [{"tool": "explain_aggregate"}],
+    good = {"action": "diagnose", "tool_calls": [{"tool": "explain_aggregate", "ok": True}],
             "diagnosis": {"recommended_index": {"directors": 1, "year": -1}}}
     assert score(diag, good, None)[0]
     assert not score(diag, {**good, "tool_calls": []}, None)[0]  # guessed without explain
@@ -46,3 +46,10 @@ def test_meta_context_never_contains_holdout_questions():
     for q in holdout_qs:
         assert q not in ctx
     assert json.loads(ctx)["train_metrics"]["total"] == len(train)
+
+
+def test_rejected_explain_call_does_not_count():
+    diag = {"family": "diagnose", "gold_diagnosis": {"index_keys": [["directors", "year"]]}}
+    out = {"action": "diagnose", "diagnosis": {"recommended_index": {"directors": 1, "year": -1}},
+           "tool_calls": [{"tool": "explain_aggregate", "ok": False, "error": "blocked_stages: $out"}]}
+    assert not score(diag, out, None)[0]

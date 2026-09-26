@@ -89,7 +89,8 @@ def compare(result: list[dict], gold: list[dict], comparison: dict) -> tuple[boo
 
     if mode == "scalar":
         field = comparison.get("value")
-        target = _gold_column(gold, field)[0] if field else (leaves(gold[0])[0] if gold else None)
+        column = _gold_column(gold, field) if field else (leaves(gold[0]) if gold else [])
+        target = column[0] if column else None
         if target is None:
             return (len(result) == 0 or all(not leaves(d) for d in result)), "empty scalar"
         if len(result) != 1:

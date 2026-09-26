@@ -60,7 +60,7 @@ def classify(task: dict, traj: dict) -> str | None:
     family = task["family"]
     error = (traj.get("error") or "").lower()
     action = traj.get("action")
-    tools_called = [c["tool"] for c in traj.get("tool_calls", [])]
+    tools_called = [c["tool"] for c in traj.get("tool_calls", []) if c.get("ok", True)]
 
     if error.startswith("json"):
         return "json_parse_failure"
