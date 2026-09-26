@@ -96,7 +96,8 @@ def warm_queries(questions: list[str]) -> None:
 
 
 def failure_text(traj: dict) -> str:
-    pipeline = json.dumps(traj.get("generated_pipeline") or traj.get("diagnosis") or {}, default=str)[:400]
+    output = traj.get("generated_pipeline") or traj.get("diagnosis") or traj.get("action_args") or {}
+    pipeline = json.dumps(output, default=str)[:400]
     return (f"Request: {traj['question']}\n"
             f"Failure type: {traj.get('failure_type')}\n"
             f"Why: {traj.get('reason') or traj.get('error') or ''}\n"

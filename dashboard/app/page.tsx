@@ -1,16 +1,21 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { GenomeRecord, StatePayload } from "@/lib/types";
+import type { GenomeRecord, RunSummary, Spotlight, StatePayload } from "@/lib/types";
 import EvolutionChart from "./components/EvolutionChart";
 import EventsPanel from "./components/EventsPanel";
 import MemoryPanel from "./components/MemoryPanel";
 import MutationPanel from "./components/MutationPanel";
 
 const POLL_MS = 2000;
+const FLOW = ["Request", "Agent actions", "Failure", "MongoDB memory", "Harness mutation", "Re-evaluation", "Accept / reject"];
 
 function pct(v: number | undefined) {
   return v === undefined ? "—" : `${Math.round(v * 100)}%`;
+}
+
+function currentRunParam(): string | null {
+  return typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("run");
 }
 
 function useHarnessState() {
@@ -18,7 +23,7 @@ function useHarnessState() {
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     let alive = true;
-    const run = new URLSearchParams(window.location.search).get("run");
+    const run = currentRunParam();
     const tick = async () => {
       try {
         const res = await fetch(`/api/state${run ? `?run=${encodeURIComponent(run)}` : ""}`, { cache: "no-store" });
@@ -35,6 +40,64 @@ function useHarnessState() {
     return () => { alive = false; clearInterval(id); };
   }, []);
   return { state, error };
+}
+
+function RunSwitcher({ runs, current }: { runs: RunSummary[]; current?: string }) {
+  if (runs.length < 2) return null;
+  return (
+    <label className="chip run-switch">
+      proving ground{" "}
+      <select value={current} onChange={(e) => { window.location.search = `?run=${e.target.value}`; }}>
+        {runs.map((r) => (
+          <option key={r.run_id} value={r.run_id}>
+            {(r.domain_title ?? "MongoDB database-operations agent")} · {r.run_id} · {r.status}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function FailureStory({ spot }: { spot: Spotlight }) {
+  if (!spot) return null;
+  const output = spot.action_args && Object.keys(spot.action_args).length
+    ? { action: spot.action, args: spot.action_args }
+    : spot.generated_pipeline ?? { action: spot.action };
+  return (
+    <section className="panel spot">
+      <h2><span className="num">00</span> Watch what happens when this agent fails <span className="note">a real Gen 0 trajectory, stored in MongoDB</span></h2>
+      <div className="story">
+        <div>
+          <div className="story-label">Request</div>
+          <p className="q">“{spot.question}”</p>
+          {spot.tool_calls && spot.tool_calls.length > 0 && (
+            <>
+              <div className="story-label">Agent actions</div>
+              <div className="toolchips">
+                {spot.tool_calls.map((c, i) => (
+                  <span key={i} className={`toolchip ${c.ok ? "" : "bad"}`}>{c.tool}{c.ok ? "" : " ✕"}</span>
+                ))}
+              </div>
+            </>
+          )}
+          <div className="story-label">Decision</div>
+          <pre>{JSON.stringify(output, null, 1)}</pre>
+        </div>
+        <div>
+          <div className="story-label">Deterministic evaluation</div>
+          <div className="verdict rej">FAILED</div>
+          <p><b className="fail mono">{spot.failure_type}</b>: {spot.reason}</p>
+          {spot.expected_behavior && (
+            <>
+              <div className="story-label">Expected workflow</div>
+              <p className="mono expected">{spot.expected_behavior}</p>
+            </>
+          )}
+          <p className="note-small">This failure is embedded with Voyage and becomes a regression test and a memory that later generations retrieve via Atlas <code>$vectorSearch</code>.</p>
+        </div>
+      </div>
+    </section>
+  );
 }
 
 function Hero({ genomes }: { genomes: GenomeRecord[] }) {
@@ -58,9 +121,9 @@ function Hero({ genomes }: { genomes: GenomeRecord[] }) {
         <div className="big">{pct(gen0?.train_accuracy)}<span className="arrow">→</span><span className="up">{pct(best?.train_accuracy)}</span></div>
       </div>
       <div className="stat">
-        <div className="label">Cost / task</div>
-        <div className="big">{costPerTask(best) !== undefined ? `$${(costPerTask(best)! * 1000).toFixed(2)}` : "—"}<small> per 1k</small></div>
-        <div className="sub">Gen 0: {costPerTask(gen0) !== undefined ? `$${(costPerTask(gen0)! * 1000).toFixed(2)}` : "—"} per 1k tasks</div>
+        <div className="label">Cost / 1k tasks</div>
+        <div className="big">{costPerTask(best) !== undefined ? `$${(costPerTask(best)! * 1000).toFixed(2)}` : "—"}</div>
+        <div className="sub">Gen 0: {costPerTask(gen0) !== undefined ? `$${(costPerTask(gen0)! * 1000).toFixed(2)}` : "—"}</div>
       </div>
       <div className="stat">
         <div className="label">Mutations</div>
@@ -77,39 +140,32 @@ export default function Page() {
   const genomes = useMemo(() => state?.genomes ?? [], [state]);
   const latest = genomes[genomes.length - 1];
   const current = genomes.find((g) => g.version === selected) ?? latest;
-  const gen0 = genomes.find((g) => g.version === 0);
-  const best = [...genomes].reverse().find((g) => g.accepted);
   const running = state?.run?.status === "running";
+  const domainTitle = state?.run?.domain_title ?? (state?.run ? "MongoDB database-operations agent" : "");
 
   return (
     <main className="page">
       <header className="masthead">
         <div>
           <h1 className="wordmark">Harness<span>Forge</span></h1>
-          <p className="tagline">Evolutionary CI/CD for AI agent harnesses — a MongoDB database agent that hardens itself from its own failures.</p>
+          <p className="tagline">Evolutionary CI/CD for operational AI agents. Production failures become measurable harness improvements.</p>
         </div>
         <div className="run-meta">
           <span className={`live ${running ? "" : "done"}`}><i />{running ? "evolving" : state?.run ? "run complete" : "idle"}</span>
-          {state?.run && <span className="chip">run {state.run.run_id}</span>}
+          {domainTitle && <span className="chip">proving ground: {domainTitle}</span>}
           {state?.run && <span className="chip">CHEAP {state.run.models.CHEAP}</span>}
-          {state?.run && <span className="chip">STRONG {state.run.models.STRONG}</span>}
           {state && <span className="chip">{state.counts.trajectories} trajectories · {state.counts.embedded} embedded · {state.counts.lessons} lessons</span>}
+          {state && <RunSwitcher runs={state.runs ?? []} current={state.run?.run_id} />}
         </div>
       </header>
 
-      {error && <div className="err">{error}</div>}
-      <Hero genomes={genomes} />
+      <ol className="flow" aria-label="HarnessForge loop">
+        {FLOW.map((step) => <li key={step}>{step}</li>)}
+      </ol>
 
-      <div className="grid-main">
-        <section className="panel">
-          <h2><span className="num">01</span> Evolution metrics <span className="note">per generation · click a point to inspect</span></h2>
-          <EvolutionChart genomes={genomes} selected={current?.version ?? null} onSelect={setSelected} />
-        </section>
-        <section className="panel">
-          <h2><span className="num">04</span> Live events <span className="note">polling Atlas every 2s</span></h2>
-          <EventsPanel events={state?.events ?? []} />
-        </section>
-      </div>
+      {error && <div className="err">{error}</div>}
+      <FailureStory spot={state?.spotlight ?? null} />
+      <Hero genomes={genomes} />
 
       <nav className="lineage" aria-label="Generations">
         {genomes.map((g) => (
@@ -122,30 +178,25 @@ export default function Page() {
 
       <div className="grid-two">
         <section className="panel">
-          <h2><span className="num">02</span> Mutation under test</h2>
+          <h2><span className="num">01</span> Harness mutation under test</h2>
           <MutationPanel record={current} />
         </section>
         <section className="panel">
-          <h2><span className="num">03</span> Memory evidence <span className="badge-atlas">Atlas $vectorSearch</span></h2>
+          <h2><span className="num">02</span> Memory evidence <span className="badge-atlas">Atlas $vectorSearch</span></h2>
           <MemoryPanel record={current} />
         </section>
       </div>
 
-      {state?.spotlight && (
-        <section className="panel spot">
-          <h2><span className="num">00</span> A Gen 0 failure <span className="note">stored as a trajectory, embedded, and turned into a regression test</span></h2>
-          <p className="q">“{state.spotlight.question}”</p>
-          <pre>{JSON.stringify(state.spotlight.generated_pipeline, null, 1)}</pre>
-          <div><b className="fail mono">{state.spotlight.failure_type}</b> — {state.spotlight.reason}</div>
-          {gen0?.train && best?.train && (
-            <div className="fam">
-              {Object.keys(gen0.train.by_family).map((f) => (
-                <div key={f}>{f}: <b>{pct(gen0.train!.by_family[f])}</b> → <b className="pass">{pct(best.train!.by_family[f])}</b></div>
-              ))}
-            </div>
-          )}
+      <div className="grid-main">
+        <section className="panel">
+          <h2><span className="num">03</span> Re-evaluation per generation <span className="note">click a point to inspect</span></h2>
+          <EvolutionChart genomes={genomes} selected={current?.version ?? null} onSelect={setSelected} />
         </section>
-      )}
+        <section className="panel">
+          <h2><span className="num">04</span> Live events <span className="note">polling Atlas every 2s</span></h2>
+          <EventsPanel events={state?.events ?? []} />
+        </section>
+      </div>
 
       <p className="closing">LLMs propose. <span>Metrics decide.</span> MongoDB remembers.</p>
     </main>

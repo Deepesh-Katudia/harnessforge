@@ -56,6 +56,7 @@ class Gates:
     max_cost_increase: float = 0.10       # relative cost increase allowed for free
     cost_per_accuracy_point: float = 0.10 # each +1pt accuracy buys +10% cost
     max_cost_increase_hard: float = 3.0   # never accept > +300% cost
+    max_infra_error_rate: float = 0.10    # above this, the measurement is invalid rather than the mutation bad
 
 
 GATES = Gates()

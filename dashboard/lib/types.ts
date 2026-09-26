@@ -52,15 +52,23 @@ export type GenomeRecord = {
 export type EventRecord = { type: string; generation: number | null; message: string; ts: string };
 
 export type Spotlight = {
+  task_id?: string;
   question: string;
   failure_type: string;
   reason: string;
-  generated_pipeline: unknown;
+  generated_pipeline?: unknown;
   action: string | null;
+  action_args?: Record<string, unknown>;
+  tool_calls?: { tool: string; ok: boolean; error?: string }[];
+  expected_behavior?: string;
 } | null;
 
+export type RunSummary = { run_id: string; domain?: string; domain_title?: string; status: string; started_at: string };
+
 export type StatePayload = {
-  run: { run_id: string; status: string; models: Record<string, string>; meta_model: string; started_at: string } | null;
+  run: { run_id: string; status: string; domain?: string; domain_title?: string; models: Record<string, string>;
+         meta_model: string; started_at: string } | null;
+  runs: RunSummary[];
   genomes: GenomeRecord[];
   events: EventRecord[];
   spotlight: Spotlight;

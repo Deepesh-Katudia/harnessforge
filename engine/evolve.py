@@ -13,7 +13,7 @@ import datetime as dt
 import logging
 import uuid
 
-from engine import config, db, gates, genome as genome_mod, memory, meta
+from engine import config, db, domains, gates, genome as genome_mod, memory, meta
 from engine.evaluate import HOLDOUT, evaluate
 
 log = logging.getLogger("harnessforge")
@@ -127,7 +127,9 @@ def _generation(run_id: str, version: int, parent: dict, parent_version: int, pa
 
 def _start_run(generations: int) -> tuple[str, dict, dict, int, int, float, list[dict]]:
     run_id = uuid.uuid4().hex[:10]
+    domain = domains.current()
     db.hf().runs.insert_one({"run_id": run_id, "started_at": now(), "status": "running",
+                             "domain": domain.name, "domain_title": domain.title,
                              "generations": generations, "models": config.MODELS, "meta_model": config.META_MODEL,
                              "gates": config.GATES.__dict__})
     parent, parent_train, spent = _baseline(run_id)

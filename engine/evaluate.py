@@ -8,7 +8,7 @@ from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-from engine import classify, config, db, memory, scorer, tools
+from engine import config, db, domains, memory, scorer, tools
 
 log = logging.getLogger(__name__)
 EVAL_DIR = Path(__file__).parent / "evals"
@@ -18,18 +18,22 @@ HOLDOUT = "holdout"  # hidden from evolution: never shown to the meta-agent, nev
 
 
 def load_tasks(split: str | None = None) -> list[dict]:
-    tasks = json.loads(EVALSET_PATH.read_text(encoding="utf-8"))["tasks"]
-    return [t for t in tasks if split is None or t["split"] == split]
+    """Tasks of the active benchmark domain (HF_DOMAIN)."""
+    return domains.current().load_tasks(split)
 
 
-def load_gold() -> dict[str, list]:
+def load_gold() -> dict:
+    return domains.current().load_gold()
+
+
+def load_mongodb_gold() -> dict[str, list]:
     if not GOLD_CACHE_PATH.exists():
         raise RuntimeError("gold cache missing: run `python -m engine.evals.build_gold` first")
     return json.loads(GOLD_CACHE_PATH.read_text(encoding="utf-8"))
 
 
 def score(task: dict, outcome: dict, gold_rows: list | None) -> tuple[bool, str]:
-    """Deterministic pass/fail for one task outcome."""
+    """Deterministic pass/fail for one MongoDB-domain task outcome."""
     family = task["family"]
     action = outcome.get("action")
     if family == "unsafe":
@@ -50,7 +54,8 @@ def score(task: dict, outcome: dict, gold_rows: list | None) -> tuple[bool, str]
 
 
 def _trajectory(task: dict, outcome: dict, gold: dict, ctx: dict) -> dict:
-    passed, reason = score(task, outcome, gold.get(task["id"]))
+    domain = domains.current()
+    passed, reason = domain.score(task, outcome, gold.get(task["id"]))
     rows = tools.to_jsonable(outcome.get("rows") or [])
     traj = {
         **ctx, **{k: v for k, v in outcome.items() if k != "rows"},
@@ -59,14 +64,14 @@ def _trajectory(task: dict, outcome: dict, gold: dict, ctx: dict) -> dict:
         "normalized_result": rows[:10], "pass": passed, "reason": reason,
         "created_at": dt.datetime.now(dt.timezone.utc),
     }
-    traj["failure_type"] = classify.classify(task, traj)
+    is_infra = (traj.get("error") or "").startswith("harness error")
+    traj["failure_type"] = "harness_error" if is_infra and not passed else domain.classify(task, traj)
     return traj
 
 
 def _safe_run(genome: dict, task: dict, run_id: str) -> dict:
-    from engine import agent  # local import keeps scorer tests free of network deps
     try:
-        return agent.run_task(genome, task, run_id=run_id)
+        return domains.current().run_task(genome, task, run_id=run_id)
     except Exception as exc:  # one broken task must not kill the generation; record it as a failure
         log.exception("task %s crashed", task["id"])
         return {"action": None, "error": f"harness error: {exc}", "tool_calls": [], "cost_usd": 0.0, "latency_ms": 0}
@@ -75,7 +80,7 @@ def _safe_run(genome: dict, task: dict, run_id: str) -> dict:
 def evaluate(genome: dict, split: str, run_id: str, generation: int, role: str) -> dict:
     tasks = load_tasks(split)
     gold = load_gold()
-    ctx = {"run_id": run_id, "generation": generation, "role": role}
+    ctx = {"run_id": run_id, "generation": generation, "role": role, "domain": domains.name()}
     runs = [(t, r) for t in tasks for r in range(config.EVAL_REPEATS)]
     with ThreadPoolExecutor(max_workers=config.EVAL_WORKERS) as pool:
         outcomes = list(pool.map(lambda tr: _safe_run(genome, tr[0], run_id), runs))
@@ -106,7 +111,7 @@ def summarize(trajs: list[dict]) -> dict:
         "cost_usd": round(sum(t.get("cost_usd", 0.0) for t in trajs), 6),
         "latency_ms": int(sum(t.get("latency_ms", 0) for t in trajs) / runs) if runs else 0,
         "failures": [{k: t.get(k) for k in ("task_id", "question", "failure_type", "reason", "action",
-                                            "generated_pipeline", "diagnosis", "tool_calls")}
+                                            "generated_pipeline", "diagnosis", "action_args", "tool_calls")}
                      for t in trajs
                      if not t["pass"] and t["task_id"] not in seen and not seen.add(t["task_id"])],
     }

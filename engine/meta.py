@@ -11,12 +11,11 @@ from collections import Counter
 
 from langsmith import traceable
 
-from engine import config, genome as genome_mod, llm, memory
+from engine import config, domains, genome as genome_mod, llm, memory
 
 log = logging.getLogger(__name__)
 
-META_PROMPT = """You are the meta-engineer of an AI agent harness. The task agent answers MongoDB database
-requests (queries, slow-query diagnosis, and requests it must refuse because they would write data).
+META_PROMPT = """You are the meta-engineer of an AI agent harness. %(agent_description)s
 You improve the agent ONLY by editing its harness "genome" with exactly ONE patch per generation.
 Every patch is objectively re-evaluated; patches that do not raise accuracy, cause regressions,
 or cost too much are rejected. Prefer cheap, targeted fixes for the most common failure type.
@@ -27,7 +26,7 @@ Patch ops (JSON):
   {"op": "set", "path": "<path>", "value": <value>}   allowed: %(settable)s
   {"op": "enable_guardrail" | "disable_guardrail", "value": <one of %(guardrails)s>}
   {"op": "enable_tool" | "disable_tool", "value": <one of %(tools)s>}
-Locked (cannot change): guardrails %(locked)s, tool run_aggregate.
+Locked (cannot change): guardrails %(locked)s, tools %(locked_tools)s.
 Procedural guardrails also enable the tool they enforce: %(requires)s.
 Note: the CHEAP model rarely calls optional tools on its own; procedural guardrails force it to.
 Model tiers: CHEAP (%(cheap)s, very low cost) and STRONG (%(strong)s, ~15x cost).
@@ -38,12 +37,16 @@ Reply with JSON only:
 
 
 def _system_prompt() -> str:
+    domain = domains.current()
+    spec = domain.spec
     return META_PROMPT % {
-        "settable": json.dumps({k: list(v) for k, v in genome_mod.SETTABLE_PATHS.items()}),
-        "guardrails": list(genome_mod.EVOLVABLE_GUARDRAILS),
-        "tools": list(genome_mod.ALL_TOOLS),
-        "locked": list(genome_mod.LOCKED_GUARDRAILS),
-        "requires": json.dumps(genome_mod.GUARDRAIL_REQUIRES),
+        "agent_description": domain.agent_description,
+        "settable": json.dumps({k: list(v) for k, v in spec.settable_paths.items()}),
+        "guardrails": list(spec.evolvable_guardrails),
+        "tools": list(spec.all_tools),
+        "locked": list(spec.locked_guardrails),
+        "locked_tools": list(spec.locked_tools),
+        "requires": json.dumps(spec.guardrail_requires),
         "cheap": config.MODELS["CHEAP"], "strong": config.MODELS["STRONG"],
     }
 
@@ -52,7 +55,8 @@ def _compact_failure(f: dict) -> dict:
     return {
         "question": f["question"], "failure_type": f.get("failure_type"), "why": (f.get("reason") or "")[:200],
         "agent_action": f.get("action"),
-        "agent_output": json.dumps(f.get("generated_pipeline") or f.get("diagnosis") or {}, default=str)[:300],
+        "agent_output": json.dumps(f.get("generated_pipeline") or f.get("diagnosis") or f.get("action_args") or {},
+                                   default=str)[:300],
         "tools_called": [c["tool"] for c in f.get("tool_calls") or []],
     }
 

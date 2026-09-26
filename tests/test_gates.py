@@ -55,3 +55,10 @@ def test_single_flip_tolerated_as_noise_floor_but_two_are_not():
     assert decide(parent, one)["accepted"]
     assert decide(parent, one)["regressed_tasks"] == ["a"]
     assert not decide(parent, two)["accepted"]
+
+
+def test_infrastructure_errors_invalidate_the_measurement():
+    parent = metrics(0.5, {"a": 1.0, "b": 0.0})
+    child = {**metrics(0.9, {"a": 1.0, "b": 1.0}), "runs": 10, "failure_counts": {"harness_error": 3}}
+    verdict = decide(parent, child)
+    assert not verdict["accepted"] and not verdict["checks"]["evaluation_valid"]

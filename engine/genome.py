@@ -3,36 +3,15 @@
 Genomes are treated as immutable values: every function here returns a new dict
 and never mutates its input. Mutations arrive as structured patches from the
 meta-agent and must pass `validate_patch` before `apply_patch`.
+
+What a genome may contain (tools, guardrails, settable knobs) is declared per
+benchmark domain by a GenomeSpec; the patch language itself is domain-agnostic.
 """
 from __future__ import annotations
 
 import copy
+from dataclasses import dataclass
 from typing import Any
-
-LOCKED_GUARDRAILS = ("read_only", "allowed_collections", "blocked_stages", "max_time_ms")
-EVOLVABLE_GUARDRAILS = (
-    "limit_cap",
-    "pipeline_length_cap",
-    "require_explain_before_diagnosis",
-    "require_schema_before_query",
-    "refuse_write_intent",
-)
-ALL_TOOLS = ("get_schema", "sample_docs", "list_indexes", "explain_aggregate", "run_aggregate", "collection_stats")
-LOCKED_TOOLS = ("run_aggregate",)
-# Procedural guardrails bring the tool they enforce; a single mutation must be self-contained.
-GUARDRAIL_REQUIRES = {
-    "require_explain_before_diagnosis": "explain_aggregate",
-    "require_schema_before_query": "get_schema",
-}
-
-SETTABLE_PATHS: dict[str, tuple] = {
-    "context.include_schema": (True, False),
-    "context.sample_docs_k": (0, 1, 2, 3),
-    "context.memory_k": (0, 1, 2, 3, 5),
-    "routing.generator_model": ("CHEAP", "STRONG"),
-    "routing.repair_model": ("CHEAP", "STRONG"),
-    "routing.max_retries": (0, 1, 2),
-}
 
 MAX_RULES = 12
 MAX_RULE_CHARS = 240
@@ -43,6 +22,46 @@ PATCH_OPS = (
     "enable_tool", "disable_tool",
 )
 
+ROUTING_PATHS: dict[str, tuple] = {
+    "routing.generator_model": ("CHEAP", "STRONG"),
+    "routing.repair_model": ("CHEAP", "STRONG"),
+    "routing.max_retries": (0, 1, 2),
+}
+
+
+@dataclass(frozen=True)
+class GenomeSpec:
+    """The evolvable surface of one benchmark domain."""
+    locked_guardrails: tuple
+    evolvable_guardrails: tuple
+    all_tools: tuple
+    locked_tools: tuple
+    guardrail_requires: dict   # procedural guardrail -> tool it enforces (enabled together)
+    settable_paths: dict
+    seed: dict
+
+
+# --- MongoDB database-operations benchmark -------------------------------------------------
+LOCKED_GUARDRAILS = ("read_only", "allowed_collections", "blocked_stages", "max_time_ms")
+EVOLVABLE_GUARDRAILS = (
+    "limit_cap",
+    "pipeline_length_cap",
+    "require_explain_before_diagnosis",
+    "require_schema_before_query",
+    "refuse_write_intent",
+)
+ALL_TOOLS = ("get_schema", "sample_docs", "list_indexes", "explain_aggregate", "run_aggregate", "collection_stats")
+LOCKED_TOOLS = ("run_aggregate",)
+GUARDRAIL_REQUIRES = {
+    "require_explain_before_diagnosis": "explain_aggregate",
+    "require_schema_before_query": "get_schema",
+}
+SETTABLE_PATHS: dict[str, tuple] = {
+    "context.include_schema": (True, False),
+    "context.sample_docs_k": (0, 1, 2, 3),
+    "context.memory_k": (0, 1, 2, 3, 5),
+    **ROUTING_PATHS,
+}
 SEED_GENOME: dict[str, Any] = {
     "rules": [],
     "context": {"include_schema": False, "sample_docs_k": 0, "memory_k": 0},
@@ -50,14 +69,21 @@ SEED_GENOME: dict[str, Any] = {
     "tools": ["run_aggregate"],
     "routing": {"generator_model": "CHEAP", "repair_model": "CHEAP", "max_retries": 0, "temperature": 0},
 }
+MONGODB_SPEC = GenomeSpec(LOCKED_GUARDRAILS, EVOLVABLE_GUARDRAILS, ALL_TOOLS, LOCKED_TOOLS,
+                          GUARDRAIL_REQUIRES, SETTABLE_PATHS, SEED_GENOME)
+
+
+def active_spec() -> GenomeSpec:
+    from engine import domains  # late import: domains imports this module
+    return domains.current().spec
 
 
 class PatchError(ValueError):
     """Raised when a proposed patch is not allowed."""
 
 
-def seed() -> dict[str, Any]:
-    return copy.deepcopy(SEED_GENOME)
+def seed(spec: GenomeSpec | None = None) -> dict[str, Any]:
+    return copy.deepcopy((spec or active_spec()).seed)
 
 
 def _get_path(genome: dict, path: str) -> Any:
@@ -65,8 +91,9 @@ def _get_path(genome: dict, path: str) -> Any:
     return genome[section][key]
 
 
-def validate_patch(genome: dict, patch: Any) -> None:
+def validate_patch(genome: dict, patch: Any, spec: GenomeSpec | None = None) -> None:
     """Raise PatchError if `patch` is not a legal single mutation of `genome`."""
+    spec = spec or active_spec()
     if not isinstance(patch, dict):
         raise PatchError("patch must be an object")
     op = patch.get("op")
@@ -88,35 +115,36 @@ def validate_patch(genome: dict, patch: Any) -> None:
             raise PatchError("remove_rule value must be an existing rule or index")
     elif op == "set":
         path = patch.get("path")
-        if path not in SETTABLE_PATHS:
+        if path not in spec.settable_paths:
             raise PatchError(f"path {path!r} is not settable")
-        if value not in SETTABLE_PATHS[path] or type(value) is not type(SETTABLE_PATHS[path][0]):
+        if value not in spec.settable_paths[path] or type(value) is not type(spec.settable_paths[path][0]):
             raise PatchError(f"value {value!r} not allowed for {path}")
         if _get_path(genome, path) == value:
             raise PatchError(f"{path} already {value!r}")
     elif op in ("enable_guardrail", "disable_guardrail"):
-        if value in LOCKED_GUARDRAILS:
+        if value in spec.locked_guardrails:
             raise PatchError(f"guardrail {value!r} is locked")
-        if value not in EVOLVABLE_GUARDRAILS:
+        if value not in spec.evolvable_guardrails:
             raise PatchError(f"unknown guardrail {value!r}")
         enabled = value in genome["guardrails"]
         if (op == "enable_guardrail") == enabled:
             raise PatchError(f"guardrail {value!r} already {'enabled' if enabled else 'disabled'}")
     elif op in ("enable_tool", "disable_tool"):
-        if value not in ALL_TOOLS:
+        if value not in spec.all_tools:
             raise PatchError(f"unknown tool {value!r}")
-        if op == "disable_tool" and value in LOCKED_TOOLS:
+        if op == "disable_tool" and value in spec.locked_tools:
             raise PatchError(f"tool {value!r} is locked")
-        if op == "disable_tool" and any(GUARDRAIL_REQUIRES.get(gr) == value for gr in genome["guardrails"]):
+        if op == "disable_tool" and any(spec.guardrail_requires.get(gr) == value for gr in genome["guardrails"]):
             raise PatchError(f"tool {value!r} is required by an enabled guardrail")
         present = value in genome["tools"]
         if (op == "enable_tool") == present:
             raise PatchError(f"tool {value!r} already {'enabled' if present else 'disabled'}")
 
 
-def apply_patch(genome: dict, patch: dict) -> dict:
+def apply_patch(genome: dict, patch: dict, spec: GenomeSpec | None = None) -> dict:
     """Validate and apply `patch`, returning a new genome."""
-    validate_patch(genome, patch)
+    spec = spec or active_spec()
+    validate_patch(genome, patch, spec)
     child = copy.deepcopy(genome)
     op, value = patch["op"], patch.get("value")
     if op == "add_rule":
@@ -129,7 +157,7 @@ def apply_patch(genome: dict, patch: dict) -> dict:
         child[section] = {**child[section], key: value}
     elif op == "enable_guardrail":
         child["guardrails"] = [*child["guardrails"], value]
-        needed = GUARDRAIL_REQUIRES.get(value)
+        needed = spec.guardrail_requires.get(value)
         if needed and needed not in child["tools"]:
             child["tools"] = [*child["tools"], needed]
     elif op == "disable_guardrail":

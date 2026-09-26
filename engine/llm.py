@@ -4,18 +4,20 @@ from __future__ import annotations
 import json
 import logging
 import os
+import random
 import re
 import time
 from dataclasses import dataclass
 from functools import lru_cache
 from typing import Any
 
-from openai import OpenAI, OpenAIError
+from openai import OpenAI, OpenAIError, RateLimitError
 
 from engine import config
 
 log = logging.getLogger(__name__)
 MAX_ATTEMPTS = 3
+MAX_RATE_LIMIT_ATTEMPTS = 7   # provider RPM caps (e.g. new-account limits) need patience, not failure
 
 
 @dataclass(frozen=True)
@@ -59,7 +61,8 @@ def chat(model: str, messages: list[dict], temperature: float = 0.0, json_mode: 
     if json_mode:
         kwargs["response_format"] = {"type": "json_object"}
     last_exc: Exception | None = None
-    for attempt in range(MAX_ATTEMPTS):
+    attempt, rate_limited = 0, 0
+    while attempt < MAX_ATTEMPTS and rate_limited < MAX_RATE_LIMIT_ATTEMPTS:
         start = time.perf_counter()
         try:
             resp = _client().chat.completions.create(**kwargs)
@@ -72,11 +75,18 @@ def chat(model: str, messages: list[dict], temperature: float = 0.0, json_mode: 
                 cost_usd=_cost(model, usage) if usage else 0.0,
                 latency_ms=int((time.perf_counter() - start) * 1000),
             )
+        except RateLimitError as exc:
+            last_exc = exc
+            rate_limited += 1
+            delay = min(60.0, 5.0 * 2 ** (rate_limited - 1)) * (0.5 + random.random())
+            log.warning("openrouter rate limited on %s; retry %d in %.0fs", model, rate_limited, delay)
+            time.sleep(delay)
         except OpenAIError as exc:
             last_exc = exc
-            log.warning("openrouter call failed (attempt %d/%d): %s", attempt + 1, MAX_ATTEMPTS, exc)
+            attempt += 1
+            log.warning("openrouter call failed (attempt %d/%d): %s", attempt, MAX_ATTEMPTS, str(exc)[:200])
             time.sleep(1.5 * 2 ** attempt)
-    raise RuntimeError(f"OpenRouter call failed after {MAX_ATTEMPTS} attempts: {last_exc}")
+    raise RuntimeError(f"OpenRouter call failed after retries: {str(last_exc)[:300]}")
 
 
 _FENCE = re.compile(r"```(?:json)?\s*(.*?)```", re.DOTALL)

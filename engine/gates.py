@@ -33,7 +33,10 @@ def decide(parent: dict, child: dict, gates: Gates = GATES) -> dict:
     reg = round(len(broken) / base, 4) if base else 0.0
     allowed = max(gates.regression_task_floor, int(gates.max_regression_rate * base))
     dcost = cost_change(parent["cost_usd"], child["cost_usd"])
+    infra_errors = child.get("failure_counts", {}).get("harness_error", 0)
+    runs = child.get("runs") or child.get("total") or 1
     checks = {
+        "evaluation_valid": infra_errors / runs <= gates.max_infra_error_rate,
         "accuracy_improved": gain > 0,
         "regression_ok": len(broken) <= allowed,
         "cost_ok": dcost <= min(gates.max_cost_increase_hard,

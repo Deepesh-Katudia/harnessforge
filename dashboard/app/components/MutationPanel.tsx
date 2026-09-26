@@ -3,8 +3,9 @@ import type { GenomeRecord } from "@/lib/types";
 const CHECK_LABELS: Record<string, string> = {
   accuracy_improved: "Child train accuracy > parent",
   regression_ok: "Stable passes lost ≤ max(1 task, 10%)",
-  cost_ok: "Cost within budget (or big accuracy gain)",
+  cost_ok: "Cost increase ≤ 10% + 10% per accuracy point",
   valid_patch: "Patch passes allowlist validation",
+  evaluation_valid: "Evaluation valid (≤10% infrastructure errors)",
 };
 
 function fmt(v: unknown) {
@@ -22,8 +23,8 @@ export default function MutationPanel({ record }: { record: GenomeRecord | undef
   if (record.version === 0) {
     return (
       <div>
-        <p style={{ marginTop: 0 }}><b>Gen 0 — the blank harness.</b> No rules, no schema, no memory, cheap model, no retries,
-          only the <code>run_aggregate</code> tool. Locked guardrails: read-only, allowlisted collections, blocked stages, maxTimeMS.</p>
+        <p style={{ marginTop: 0 }}><b>Gen 0: the deliberately weak harness.</b> No rules, no memory, cheap model, no retries,
+          minimal tools. Only the locked safety guardrails are on; every other capability has to be earned through evaluation.</p>
         <div className="diff">{JSON.stringify(record.genome, null, 1)}</div>
       </div>
     );

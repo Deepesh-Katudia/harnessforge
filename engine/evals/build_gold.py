@@ -9,11 +9,13 @@ from __future__ import annotations
 import json
 
 from engine import genome, tools
-from engine.evaluate import GOLD_CACHE_PATH, load_tasks
+from engine import domains
+from engine.evaluate import GOLD_CACHE_PATH
 
 
 def main() -> None:
-    permissive = genome.seed()  # locked guardrails only
+    permissive = genome.seed(genome.MONGODB_SPEC)  # locked guardrails only
+    load_tasks = domains.get("mongodb").load_tasks
     gold: dict[str, list] = {}
     problems: list[str] = []
     for task in load_tasks():
