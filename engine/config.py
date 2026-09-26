@@ -52,6 +52,7 @@ EVAL_REPEATS = int(os.getenv("EVAL_REPEATS", "3"))  # runs per task; damps LLM n
 @dataclass(frozen=True)
 class Gates:
     max_regression_rate: float = 0.10     # share of majority-passing parent tasks that flip to majority-failing
+    regression_task_floor: int = 1        # always tolerate this many flips (noise floor for small eval sets)
     max_cost_increase: float = 0.10       # relative cost increase allowed for free
     cost_per_accuracy_point: float = 0.10 # each +1pt accuracy buys +10% cost
     max_cost_increase_hard: float = 3.0   # never accept > +300% cost

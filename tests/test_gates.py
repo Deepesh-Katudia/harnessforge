@@ -43,6 +43,15 @@ def test_regression_uses_majority_of_repeats():
 
 def test_rejects_regressions_and_no_gain():
     parent = metrics(0.5, {"a": True, "b": True, "c": False, "d": False})
-    swapped = metrics(0.75, {"a": False, "b": True, "c": True, "d": True})
+    swapped = metrics(0.75, {"a": False, "b": False, "c": True, "d": True})
     assert not decide(parent, swapped)["accepted"]
     assert not decide(parent, metrics(0.5, parent["pass_map"]))["accepted"]
+
+
+def test_single_flip_tolerated_as_noise_floor_but_two_are_not():
+    parent = metrics(0.23, {"a": 1.0, "b": 1.0, "c": 1.0, "d": 1.0, "e": 1.0, "f": 1.0, "g": 0.0, "h": 0.0})
+    one = metrics(0.38, {**parent["pass_map"], "a": 0.33, "g": 1.0, "h": 1.0})
+    two = metrics(0.38, {**parent["pass_map"], "a": 0.33, "b": 0.0, "g": 1.0, "h": 1.0})
+    assert decide(parent, one)["accepted"]
+    assert decide(parent, one)["regressed_tasks"] == ["a"]
+    assert not decide(parent, two)["accepted"]

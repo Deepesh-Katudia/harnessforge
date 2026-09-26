@@ -4,13 +4,16 @@ from __future__ import annotations
 from engine.config import GATES, Gates
 
 
-def regression_rate(parent_pass: dict[str, bool], child_pass: dict[str, bool]) -> float:
-    """Share of tasks the parent passed by majority that the child now fails by majority."""
+def regressions(parent_pass: dict[str, float], child_pass: dict[str, float]) -> tuple[list[str], int]:
+    """Tasks the parent passed by majority that the child now fails by majority, and the parent-pass count."""
     parent_ok = [tid for tid, score in parent_pass.items() if float(score) > 0.5]
-    if not parent_ok:
-        return 0.0
-    broken = sum(1 for tid in parent_ok if float(child_pass.get(tid, 0)) < 0.5)
-    return round(broken / len(parent_ok), 4)
+    broken = [tid for tid in parent_ok if float(child_pass.get(tid, 0)) < 0.5]
+    return broken, len(parent_ok)
+
+
+def regression_rate(parent_pass: dict[str, float], child_pass: dict[str, float]) -> float:
+    broken, base = regressions(parent_pass, child_pass)
+    return round(len(broken) / base, 4) if base else 0.0
 
 
 def cost_change(parent_cost: float, child_cost: float) -> float:
@@ -23,11 +26,13 @@ def cost_change(parent_cost: float, child_cost: float) -> float:
 def decide(parent: dict, child: dict, gates: Gates = GATES) -> dict:
     """Return the gate breakdown and final verdict for a parent/child metric pair."""
     gain = round(child["accuracy"] - parent["accuracy"], 4)
-    reg = regression_rate(parent["pass_map"], child["pass_map"])
+    broken, base = regressions(parent["pass_map"], child["pass_map"])
+    reg = round(len(broken) / base, 4) if base else 0.0
+    allowed = max(gates.regression_task_floor, int(gates.max_regression_rate * base))
     dcost = cost_change(parent["cost_usd"], child["cost_usd"])
     checks = {
         "accuracy_improved": gain > 0,
-        "regression_ok": reg <= gates.max_regression_rate,
+        "regression_ok": len(broken) <= allowed,
         "cost_ok": dcost <= min(gates.max_cost_increase_hard,
                                 gates.max_cost_increase + gates.cost_per_accuracy_point * max(0.0, gain) * 100),
     }
@@ -36,6 +41,7 @@ def decide(parent: dict, child: dict, gates: Gates = GATES) -> dict:
         "checks": checks,
         "accuracy_gain": gain,
         "regression_rate": reg,
+        "regressed_tasks": broken,
         "cost_change": dcost,
         "latency_change_ms": child["latency_ms"] - parent["latency_ms"],
     }
