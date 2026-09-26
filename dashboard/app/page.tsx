@@ -23,21 +23,25 @@ function useHarnessState() {
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     let alive = true;
+    let id: ReturnType<typeof setInterval> | undefined;
     const run = currentRunParam();
     const tick = async () => {
       try {
         const res = await fetch(`/api/state${run ? `?run=${encodeURIComponent(run)}` : ""}`, { cache: "no-store" });
         const body = await res.json();
         if (!alive) return;
-        if (!res.ok) setError(body.error ?? "Failed to load state");
-        else { setState(body); setError(null); }
+        if (!res.ok) { setError(body.error ?? "Failed to load state"); return; }
+        setState(body);
+        setError(null);
+        // A finished run never changes: stop polling instead of refreshing forever.
+        if (body.run?.status === "complete" && id !== undefined) { clearInterval(id); id = undefined; }
       } catch {
         if (alive) setError("Dashboard cannot reach the API.");
       }
     };
+    id = setInterval(tick, POLL_MS);
     tick();
-    const id = setInterval(tick, POLL_MS);
-    return () => { alive = false; clearInterval(id); };
+    return () => { alive = false; if (id !== undefined) clearInterval(id); };
   }, []);
   return { state, error };
 }
@@ -58,43 +62,46 @@ function RunSwitcher({ runs, current }: { runs: RunSummary[]; current?: string }
   );
 }
 
-function FailureStory({ spot }: { spot: Spotlight }) {
-  if (!spot) return null;
-  const output = spot.action_args && Object.keys(spot.action_args).length
-    ? { action: spot.action, args: spot.action_args }
-    : spot.generated_pipeline ?? { action: spot.action };
+function decisionOf(spot: NonNullable<Spotlight>) {
+  if (spot.action_args && Object.keys(spot.action_args).length) return { action: spot.action, args: spot.action_args };
+  return spot.generated_pipeline ?? spot.diagnosis ?? { action: spot.action };
+}
+
+function Trajectory({ spot, label, passed }: { spot: NonNullable<Spotlight>; label: string; passed: boolean }) {
+  return (
+    <div className={`traj ${passed ? "traj-pass" : "traj-fail"}`}>
+      <div className="traj-head">
+        <span className="story-label">{label}</span>
+        <span className={`verdict ${passed ? "acc" : "rej"}`}>{passed ? "PASSED" : "FAILED"}</span>
+      </div>
+      {spot.tool_calls && spot.tool_calls.length > 0 && (
+        <div className="toolchips">
+          {spot.tool_calls.map((c, i) => (
+            <span key={i} className={`toolchip ${c.ok ? "" : "bad"}`}>{c.tool}{c.ok ? "" : " ✕"}</span>
+          ))}
+        </div>
+      )}
+      <pre>{JSON.stringify(decisionOf(spot), null, 1)}</pre>
+      <p className="traj-why">{passed ? "Deterministic check: correct action, correct arguments, evidence gathered first."
+                                      : <><b className="fail mono">{spot.failure_type}</b>: {spot.reason}</>}</p>
+    </div>
+  );
+}
+
+function FailureStory({ before, after, bestVersion }: { before: Spotlight; after: Spotlight; bestVersion: number }) {
+  if (!before) return null;
   return (
     <section className="panel spot">
-      <h2><span className="num">00</span> Watch what happens when this agent fails <span className="note">a real Gen 0 trajectory, stored in MongoDB</span></h2>
+      <h2><span className="num">00</span> Same ticket, before and after evolution
+        <span className="note">real trajectories stored in MongoDB · scored deterministically, no LLM judge</span></h2>
+      <p className="q">“{before.question}”</p>
+      {before.expected_behavior && <p className="mono expected">Expected: {before.expected_behavior}</p>}
       <div className="story">
-        <div>
-          <div className="story-label">Request</div>
-          <p className="q">“{spot.question}”</p>
-          {spot.tool_calls && spot.tool_calls.length > 0 && (
-            <>
-              <div className="story-label">Agent actions</div>
-              <div className="toolchips">
-                {spot.tool_calls.map((c, i) => (
-                  <span key={i} className={`toolchip ${c.ok ? "" : "bad"}`}>{c.tool}{c.ok ? "" : " ✕"}</span>
-                ))}
-              </div>
-            </>
-          )}
-          <div className="story-label">Decision</div>
-          <pre>{JSON.stringify(output, null, 1)}</pre>
-        </div>
-        <div>
-          <div className="story-label">Deterministic evaluation</div>
-          <div className="verdict rej">FAILED</div>
-          <p><b className="fail mono">{spot.failure_type}</b>: {spot.reason}</p>
-          {spot.expected_behavior && (
-            <>
-              <div className="story-label">Expected workflow</div>
-              <p className="mono expected">{spot.expected_behavior}</p>
-            </>
-          )}
-          <p className="note-small">This failure is embedded with Voyage and becomes a regression test and a memory that later generations retrieve via Atlas <code>$vectorSearch</code>.</p>
-        </div>
+        <Trajectory spot={before} label="Gen 0 · weak harness" passed={false} />
+        {after
+          ? <Trajectory spot={after} label={`Gen ${bestVersion} · evolved harness`} passed />
+          : <div className="traj traj-pending"><span className="story-label">Evolving…</span>
+              <p className="note-small">The failure is embedded with Voyage and retrieved via Atlas <code>$vectorSearch</code> while the harness evolves.</p></div>}
       </div>
     </section>
   );
@@ -164,7 +171,7 @@ export default function Page() {
       </ol>
 
       {error && <div className="err">{error}</div>}
-      <FailureStory spot={state?.spotlight ?? null} />
+      <FailureStory before={state?.spotlight ?? null} after={state?.spotlightAfter ?? null} bestVersion={state?.bestVersion ?? 0} />
       <Hero genomes={genomes} />
 
       <nav className="lineage" aria-label="Generations">

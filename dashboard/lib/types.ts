@@ -61,6 +61,9 @@ export type Spotlight = {
   action_args?: Record<string, unknown>;
   tool_calls?: { tool: string; ok: boolean; error?: string }[];
   expected_behavior?: string;
+  generation?: number;
+  pass?: boolean;
+  diagnosis?: unknown;
 } | null;
 
 export type RunSummary = { run_id: string; domain?: string; domain_title?: string; status: string; started_at: string };
@@ -72,6 +75,8 @@ export type StatePayload = {
   genomes: GenomeRecord[];
   events: EventRecord[];
   spotlight: Spotlight;
+  spotlightAfter: Spotlight;
+  bestVersion: number;
   counts: { trajectories: number; embedded: number; lessons: number };
   error?: string;
 };

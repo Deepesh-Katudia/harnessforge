@@ -181,3 +181,12 @@ code, pre, .mono { font-family: var(--font-mono); }
 .spot { margin-bottom: 18px; }
 .run-switch select { font-family: var(--font-mono); font-size: 11.5px; border: none; background: transparent; color: var(--ink); max-width: 260px; }
 @media (max-width: 960px) { .story { grid-template-columns: 1fr; } }
+
+.traj { border: 1.5px solid var(--line); border-radius: var(--radius-sm); padding: 12px 14px; background: var(--surface); min-width: 0; }
+.traj-fail { border-color: var(--reject); background: color-mix(in srgb, var(--reject-soft) 55%, var(--surface)); }
+.traj-pass { border-color: var(--accept); background: color-mix(in srgb, var(--accept-soft) 55%, var(--surface)); }
+.traj-pending { border-style: dashed; }
+.traj-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 8px; }
+.traj-head .story-label { margin: 0; }
+.traj pre { margin: 8px 0; }
+.traj-why { margin: 6px 0 0; font-size: 13.5px; }
