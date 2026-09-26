@@ -71,7 +71,7 @@ Cheap model: `meta-llama/llama-3.1-8b-instruct`. Meta-agent: `anthropic/claude-s
 | 7, 9 | invalid proposals | ❌ rejected by patch validator | — | — |
 | 8, 10 | more rules | ❌ regressions | — | — |
 
-- **Hidden holdout 18% → 67%** at roughly the same cost per task ($0.03 → $0.09 per 1k task-runs on the cheap model).
+- **Hidden holdout 18% → 67%** while staying on the cheap model. Cost per task-run rose 3× in relative terms ($0.03 → $0.09 per 1,000 runs), still under $0.0001 per task. The meta-agent never switched to the ~15× pricier STRONG model.
 - Diagnose tasks went from **0% → 71%** once the harness forced `explain` before any index recommendation.
 - Gen 4 → 5 shows the meta-agent learning from a rejection: the same idea, scoped to avoid the regression it caused.
 - `$vectorSearch` for *"Find the five highest-rated Nolan films"* returns other **ranking** failures (Nolan list 0.80, top directors 0.75, top comedies 0.75).
