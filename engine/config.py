@@ -35,7 +35,9 @@ PRICING = {
 ALLOWED_COLLECTIONS = {
     "movies": ("sample_mflix", "movies"),
     "comments": ("sample_mflix", "comments"),
-    "sales": ("sample_supplies", "sales"),
+    "accounts": ("sample_analytics", "accounts"),
+    "customers": ("sample_analytics", "customers"),
+    "transactions": ("sample_analytics", "transactions"),
 }
 
 MAX_TIME_MS = 5000
@@ -43,14 +45,15 @@ RESULT_CAP = 50          # hard cap on rows returned to the agent / scorer
 LIMIT_CAP = 20           # evolvable limit_cap guardrail value
 PIPELINE_LENGTH_CAP = 10
 MAX_AGENT_STEPS = 6
-EVAL_WORKERS = int(os.getenv("EVAL_WORKERS", "8"))
+EVAL_WORKERS = int(os.getenv("EVAL_WORKERS", "16"))
+EVAL_REPEATS = int(os.getenv("EVAL_REPEATS", "3"))  # runs per task; damps LLM non-determinism
 
 
 @dataclass(frozen=True)
 class Gates:
-    max_regression_rate: float = 0.10
-    max_cost_increase: float = 0.10       # relative
-    big_gain_override: float = 0.10       # absolute accuracy gain that excuses cost increase
+    max_regression_rate: float = 0.10     # share of majority-passing parent tasks that flip to majority-failing
+    max_cost_increase: float = 0.10       # relative cost increase allowed for free
+    cost_per_accuracy_point: float = 0.10 # each +1pt accuracy buys +10% cost
     max_cost_increase_hard: float = 3.0   # never accept > +300% cost
 
 

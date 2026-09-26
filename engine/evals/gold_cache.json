@@ -1,0 +1,377 @@
+{
+ "q01": [
+  {
+   "title": "Over the Garden Wall",
+   "rating": 9.2
+  },
+  {
+   "title": "Inside Out",
+   "rating": 8.6
+  },
+  {
+   "title": "Queen",
+   "rating": 8.5
+  },
+  {
+   "title": "For Some Inexplicable Reason",
+   "rating": 8.3
+  },
+  {
+   "title": "Kung Fury",
+   "rating": 8.3
+  }
+ ],
+ "q02": [
+  {
+   "_id": "Rocco Urbisci",
+   "avg": 8.459999999999999,
+   "n": 5
+  },
+  {
+   "_id": "Christopher Nolan",
+   "avg": 8.344444444444443,
+   "n": 9
+  },
+  {
+   "_id": "Frank Darabont",
+   "avg": 8.24,
+   "n": 5
+  },
+  {
+   "_id": "Don Hertzfeldt",
+   "avg": 8.24,
+   "n": 5
+  },
+  {
+   "_id": "Stanley Kubrick",
+   "avg": 8.175,
+   "n": 8
+  }
+ ],
+ "q03": [
+  {
+   "_id": "G\u00e8rard Depardieu",
+   "n": 67
+  },
+  {
+   "_id": "Robert De Niro",
+   "n": 58
+  },
+  {
+   "_id": "Michael Caine",
+   "n": 51
+  },
+  {
+   "_id": "Bruce Willis",
+   "n": 49
+  },
+  {
+   "_id": "Samuel L. Jackson",
+   "n": 48
+  }
+ ],
+ "q04": [
+  {
+   "_id": "Short",
+   "avg": 7.377574370709382,
+   "n": 437
+  },
+  {
+   "_id": "Documentary",
+   "avg": 7.365679824561403,
+   "n": 1824
+  },
+  {
+   "_id": "History",
+   "avg": 7.1696100917431185,
+   "n": 872
+  }
+ ],
+ "q05": [
+  {
+   "n": 370
+  }
+ ],
+ "q06": [
+  {
+   "_id": 2013,
+   "n": 1105
+  },
+  {
+   "_id": 2014,
+   "n": 1073
+  },
+  {
+   "_id": 2012,
+   "n": 955
+  },
+  {
+   "_id": 2009,
+   "n": 917
+  },
+  {
+   "_id": 2011,
+   "n": 893
+  }
+ ],
+ "q07": [
+  {
+   "title": "The Dark Knight",
+   "rating": 9.0
+  },
+  {
+   "title": "Inception",
+   "rating": 8.8
+  },
+  {
+   "title": "Interstellar",
+   "rating": 8.7
+  },
+  {
+   "title": "Memento",
+   "rating": 8.5
+  },
+  {
+   "title": "The Prestige",
+   "rating": 8.5
+  },
+  {
+   "title": "The Dark Knight Rises",
+   "rating": 8.5
+  },
+  {
+   "title": "Batman Begins",
+   "rating": 8.3
+  },
+  {
+   "title": "Following",
+   "rating": 7.6
+  },
+  {
+   "title": "Insomnia",
+   "rating": 7.2
+  }
+ ],
+ "q08": [
+  {
+   "_id": null,
+   "avg": 6.803377338624768
+  }
+ ],
+ "q09": [
+  {
+   "n": 37
+  }
+ ],
+ "q10": [
+  {
+   "n": 8753
+  }
+ ],
+ "q11": [
+  {
+   "title": "12 Years a Slave",
+   "rating": 267
+  },
+  {
+   "title": "Gravity",
+   "rating": 231
+  },
+  {
+   "title": "Gravity",
+   "rating": 231
+  },
+  {
+   "title": "Birdman: Or (The Unexpected Virtue of Ignorance)",
+   "rating": 210
+  },
+  {
+   "title": "Boyhood",
+   "rating": 185
+  }
+ ],
+ "q12": [
+  {
+   "_id": "USA",
+   "n": 5931
+  },
+  {
+   "_id": "UK",
+   "n": 1550
+  },
+  {
+   "_id": "France",
+   "n": 1547
+  },
+  {
+   "_id": "Germany",
+   "n": 1240
+  },
+  {
+   "_id": "Canada",
+   "n": 940
+  }
+ ],
+ "q13": [
+  {
+   "_id": null,
+   "avg": 3.31976401179941
+  }
+ ],
+ "q14": [
+  {
+   "title": "The Taking of Pelham 1 2 3",
+   "rating": 161
+  },
+  {
+   "title": "Ocean's Eleven",
+   "rating": 158
+  },
+  {
+   "title": "About a Boy",
+   "rating": 158
+  },
+  {
+   "title": "Terminator Salvation",
+   "rating": 158
+  },
+  {
+   "title": "50 First Dates",
+   "rating": 158
+  }
+ ],
+ "q15": [
+  {
+   "_id": "Mace Tyrell",
+   "n": 277
+  },
+  {
+   "_id": "The High Sparrow",
+   "n": 260
+  },
+  {
+   "_id": "Rodrik Cassel",
+   "n": 260
+  },
+  {
+   "_id": "Missandei",
+   "n": 258
+  },
+  {
+   "_id": "Robert Jordan",
+   "n": 257
+  }
+ ],
+ "q16": [
+  {
+   "_id": "ebay",
+   "n": 5559
+  },
+  {
+   "_id": "goog",
+   "n": 5500
+  },
+  {
+   "_id": "adbe",
+   "n": 5498
+  },
+  {
+   "_id": "crm",
+   "n": 5419
+  },
+  {
+   "_id": "nvda",
+   "n": 5263
+  }
+ ],
+ "q17": [
+  {
+   "n": 83
+  }
+ ],
+ "q18": [
+  {
+   "_id": null,
+   "avg": 50.46907216494845
+  }
+ ],
+ "q19": [
+  {
+   "_id": "InvestmentStock",
+   "n": 1746
+  },
+  {
+   "_id": "CurrencyService",
+   "n": 742
+  },
+  {
+   "_id": "Brokerage",
+   "n": 741
+  }
+ ],
+ "q20": [
+  {
+   "n": 120
+  }
+ ],
+ "q21": [
+  {
+   "_id": "English",
+   "n": 14639
+  },
+  {
+   "_id": "French",
+   "n": 2405
+  },
+  {
+   "_id": "Spanish",
+   "n": 1600
+  },
+  {
+   "_id": "German",
+   "n": 1377
+  },
+  {
+   "_id": "Italian",
+   "n": 1228
+  }
+ ],
+ "q22": [
+  {
+   "title": "Schindler's List",
+   "rating": 8.9
+  },
+  {
+   "title": "Raiders of the Lost Ark",
+   "rating": 8.6
+  },
+  {
+   "title": "Saving Private Ryan",
+   "rating": 8.6
+  },
+  {
+   "title": "Indiana Jones and the Last Crusade",
+   "rating": 8.3
+  },
+  {
+   "title": "Jurassic Park",
+   "rating": 8.1
+  }
+ ],
+ "q23": [
+  {
+   "n": 232
+  }
+ ],
+ "q24": [
+  {
+   "title": "Toy Story 3"
+  },
+  {
+   "title": "Exit Through the Gift Shop"
+  },
+  {
+   "title": "Montevideo: Taste of a Dream"
+  }
+ ]
+}

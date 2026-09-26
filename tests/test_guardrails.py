@@ -22,7 +22,7 @@ def test_non_allowlisted_collection_rejected():
     assert not gr.check_pipeline("users", [{"$match": {}}], g.seed()).ok
     lookup = [{"$lookup": {"from": "users", "localField": "a", "foreignField": "b", "as": "c"}}]
     assert not gr.check_pipeline("movies", lookup, g.seed()).ok
-    assert not gr.check_pipeline("movies", [{"$unionWith": "sales"}], g.seed()).ok  # cross-db
+    assert not gr.check_pipeline("movies", [{"$unionWith": "accounts"}], g.seed()).ok  # cross-db
 
 
 def test_lookup_into_allowlisted_same_db_ok():

@@ -6,13 +6,13 @@
    "family": "query",
    "split": "train",
    "collection": "movies",
-   "question": "Show the five highest-rated comedy movies released after 2015 that have at least 1,000 IMDb votes.",
+   "question": "Show the five highest-rated comedy movies released after 2013 that have at least 1,000 IMDb votes.",
    "gold_pipeline": [
     {
      "$match": {
       "genres": "Comedy",
       "year": {
-       "$gt": 2015
+       "$gt": 2013
       },
       "imdb.votes": {
        "$gte": 1000
@@ -530,52 +530,15 @@
    "id": "q16",
    "family": "query",
    "split": "train",
-   "collection": "sales",
-   "question": "What is the total revenue (unit price times quantity, across all items) of sales at the Denver store?",
+   "collection": "transactions",
+   "question": "Which five stock symbols appear in the most individual trades?",
    "gold_pipeline": [
     {
-     "$match": {
-      "storeLocation": "Denver"
-     }
-    },
-    {
-     "$unwind": "$items"
+     "$unwind": "$transactions"
     },
     {
      "$group": {
-      "_id": null,
-      "total": {
-       "$sum": {
-        "$multiply": [
-         "$items.price",
-         "$items.quantity"
-        ]
-       }
-      }
-     }
-    }
-   ],
-   "comparison": {
-    "mode": "scalar",
-    "value": "total"
-   },
-   "expected_behavior": "Return the correct rows via a read-only aggregation."
-  },
-  {
-   "id": "q17",
-   "family": "query",
-   "split": "holdout",
-   "collection": "sales",
-   "question": "Which store location had the most online purchases?",
-   "gold_pipeline": [
-    {
-     "$match": {
-      "purchaseMethod": "Online"
-     }
-    },
-    {
-     "$group": {
-      "_id": "$storeLocation",
+      "_id": "$transactions.symbol",
       "n": {
        "$sum": 1
       }
@@ -587,7 +550,7 @@
      }
     },
     {
-     "$limit": 1
+     "$limit": 5
     }
    ],
    "comparison": {
@@ -598,22 +561,41 @@
    "expected_behavior": "Return the correct rows via a read-only aggregation."
   },
   {
-   "id": "q18",
+   "id": "q17",
    "family": "query",
-   "split": "train",
-   "collection": "sales",
-   "question": "What is the average customer satisfaction score for sales where a coupon was used?",
+   "split": "holdout",
+   "collection": "customers",
+   "question": "How many customers hold more than five accounts?",
    "gold_pipeline": [
     {
      "$match": {
-      "couponUsed": true
+      "accounts.5": {
+       "$exists": true
+      }
      }
     },
+    {
+     "$count": "n"
+    }
+   ],
+   "comparison": {
+    "mode": "scalar",
+    "value": "n"
+   },
+   "expected_behavior": "Return the correct rows via a read-only aggregation."
+  },
+  {
+   "id": "q18",
+   "family": "query",
+   "split": "train",
+   "collection": "transactions",
+   "question": "What is the average transaction_count across all transaction buckets?",
+   "gold_pipeline": [
     {
      "$group": {
       "_id": null,
       "avg": {
-       "$avg": "$customer.satisfaction"
+       "$avg": "$transaction_count"
       }
      }
     }
@@ -628,17 +610,17 @@
    "id": "q19",
    "family": "query",
    "split": "train",
-   "collection": "sales",
-   "question": "What are the three best-selling items by total quantity sold?",
+   "collection": "accounts",
+   "question": "Which three products are held by the most accounts?",
    "gold_pipeline": [
     {
-     "$unwind": "$items"
+     "$unwind": "$products"
     },
     {
      "$group": {
-      "_id": "$items.name",
+      "_id": "$products",
       "n": {
-       "$sum": "$items.quantity"
+       "$sum": 1
       }
      }
     },
@@ -926,15 +908,15 @@
    "id": "d05",
    "family": "diagnose",
    "split": "train",
-   "collection": "sales",
-   "question": "This query on `sales` is slow in production: sales.aggregate([{\"$match\": {\"storeLocation\": \"Denver\", \"saleDate\": {\"$gte\": {\"$date\": \"2016-01-01T00:00:00Z\"}}}}]). Diagnose why and recommend the single best index for it.",
+   "collection": "transactions",
+   "question": "This query on `transactions` is slow in production: transactions.aggregate([{\"$match\": {\"account_id\": 443178, \"bucket_start_date\": {\"$gte\": {\"$date\": \"2000-01-01T00:00:00Z\"}}}}]). Diagnose why and recommend the single best index for it.",
    "slow_pipeline": [
     {
      "$match": {
-      "storeLocation": "Denver",
-      "saleDate": {
+      "account_id": 443178,
+      "bucket_start_date": {
        "$gte": {
-        "$date": "2016-01-01T00:00:00Z"
+        "$date": "2000-01-01T00:00:00Z"
        }
       }
      }
@@ -943,12 +925,12 @@
    "gold_diagnosis": {
     "index_keys": [
      [
-      "storeLocation",
-      "saleDate"
+      "account_id",
+      "bucket_start_date"
      ]
     ]
    },
-   "expected_behavior": "Run explain first (expect COLLSCAN), then recommend {storeLocation:1, saleDate:1} following Equality-Sort-Range."
+   "expected_behavior": "Run explain first (expect COLLSCAN), then recommend {account_id:1, bucket_start_date:1} following Equality-Sort-Range."
   },
   {
    "id": "d06",
@@ -1043,29 +1025,29 @@
    "id": "d09",
    "family": "diagnose",
    "split": "holdout",
-   "collection": "sales",
-   "question": "This query on `sales` is slow in production: sales.aggregate([{\"$match\": {\"customer.email\": \"cauho@witwuta.sv\"}}, {\"$sort\": {\"saleDate\": -1}}]). Diagnose why and recommend the single best index for it.",
+   "collection": "accounts",
+   "question": "This query on `accounts` is slow in production: accounts.aggregate([{\"$match\": {\"products\": \"InvestmentStock\"}}, {\"$sort\": {\"limit\": -1}}]). Diagnose why and recommend the single best index for it.",
    "slow_pipeline": [
     {
      "$match": {
-      "customer.email": "cauho@witwuta.sv"
+      "products": "InvestmentStock"
      }
     },
     {
      "$sort": {
-      "saleDate": -1
+      "limit": -1
      }
     }
    ],
    "gold_diagnosis": {
     "index_keys": [
      [
-      "customer.email",
-      "saleDate"
+      "products",
+      "limit"
      ]
     ]
    },
-   "expected_behavior": "Run explain first (expect COLLSCAN), then recommend {customer.email:1, saleDate:-1} following Equality-Sort-Range."
+   "expected_behavior": "Run explain first (expect COLLSCAN), then recommend {products:1, limit:-1} following Equality-Sort-Range."
   },
   {
    "id": "d10",

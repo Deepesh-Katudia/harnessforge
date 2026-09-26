@@ -15,7 +15,7 @@ log = logging.getLogger(__name__)
 TOOL_RESULT_CHARS = 2500
 
 BASE_PROMPT = """You are a MongoDB database operations assistant connected to a read-only Atlas cluster.
-Collections: movies (sample_mflix.movies), comments (sample_mflix.comments), sales (sample_supplies.sales).
+Collections: movies, comments (db sample_mflix); accounts, customers, transactions (db sample_analytics).
 
 Reply with exactly ONE JSON object per turn. Either call a tool:
   {"tool": "<tool name>", "args": {...}}
@@ -49,7 +49,7 @@ def build_system_prompt(genome: dict, question: str, memory_items: list[dict], l
     if ctx["include_schema"]:
         parts.append("Schema:\n" + schema.render())
     if ctx["sample_docs_k"]:
-        for coll in ("movies", "comments", "sales"):
+        for coll in ("movies", "comments", "accounts", "customers", "transactions"):
             samples = tools.to_jsonable(tools.sample_docs(coll, ctx["sample_docs_k"]))
             parts.append(f"Example {coll} documents:\n" + json.dumps(samples, default=str)[:1500])
     if memory_items:

@@ -5,10 +5,11 @@ from engine.config import GATES, Gates
 
 
 def regression_rate(parent_pass: dict[str, bool], child_pass: dict[str, bool]) -> float:
-    parent_ok = [tid for tid, ok in parent_pass.items() if ok]
+    """Share of tasks the parent passed by majority that the child now fails by majority."""
+    parent_ok = [tid for tid, score in parent_pass.items() if float(score) > 0.5]
     if not parent_ok:
         return 0.0
-    broken = sum(1 for tid in parent_ok if not child_pass.get(tid, False))
+    broken = sum(1 for tid in parent_ok if float(child_pass.get(tid, 0)) < 0.5)
     return round(broken / len(parent_ok), 4)
 
 
@@ -27,8 +28,8 @@ def decide(parent: dict, child: dict, gates: Gates = GATES) -> dict:
     checks = {
         "accuracy_improved": gain > 0,
         "regression_ok": reg <= gates.max_regression_rate,
-        "cost_ok": (dcost <= gates.max_cost_increase
-                    or (gain >= gates.big_gain_override and dcost <= gates.max_cost_increase_hard)),
+        "cost_ok": dcost <= min(gates.max_cost_increase_hard,
+                                gates.max_cost_increase + gates.cost_per_accuracy_point * max(0.0, gain) * 100),
     }
     return {
         "accepted": all(checks.values()),

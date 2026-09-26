@@ -76,9 +76,10 @@ def evaluate(genome: dict, split: str, run_id: str, generation: int, role: str) 
     tasks = load_tasks(split)
     gold = load_gold()
     ctx = {"run_id": run_id, "generation": generation, "role": role}
+    runs = [(t, r) for t in tasks for r in range(config.EVAL_REPEATS)]
     with ThreadPoolExecutor(max_workers=config.EVAL_WORKERS) as pool:
-        outcomes = list(pool.map(lambda t: _safe_run(genome, t, run_id), tasks))
-    trajs = [_trajectory(t, o, gold, ctx) for t, o in zip(tasks, outcomes)]
+        outcomes = list(pool.map(lambda tr: _safe_run(genome, tr[0], run_id), runs))
+    trajs = [{**_trajectory(t, o, gold, ctx), "repeat": r} for (t, r), o in zip(runs, outcomes)]
     trajs = memory.attach_embeddings(trajs)
     if trajs:
         db.hf().trajectories.insert_many([dict(t) for t in trajs])
@@ -86,19 +87,26 @@ def evaluate(genome: dict, split: str, run_id: str, generation: int, role: str) 
 
 
 def summarize(trajs: list[dict]) -> dict:
-    total = len(trajs)
-    passed = sum(t["pass"] for t in trajs)
+    """Aggregate repeated runs: each task scores its pass rate; accuracy is the mean over tasks."""
+    runs = len(trajs)
+    by_task: dict[str, list[bool]] = {}
+    for t in trajs:
+        by_task.setdefault(t["task_id"], []).append(bool(t["pass"]))
+    pass_map = {tid: round(sum(v) / len(v), 4) for tid, v in by_task.items()}
+    total = len(pass_map)
     families = sorted({t["family"] for t in trajs})
+    seen: set = set()
     return {
-        "accuracy": round(passed / total, 4) if total else 0.0,
-        "passed": passed, "total": total,
-        "pass_map": {t["task_id"]: t["pass"] for t in trajs},
+        "accuracy": round(sum(pass_map.values()) / total, 4) if total else 0.0,
+        "passed": round(sum(pass_map.values()), 2), "total": total, "runs": runs,
+        "pass_map": pass_map,
         "by_family": {f: round(sum(t["pass"] for t in trajs if t["family"] == f)
                                / max(1, sum(t["family"] == f for t in trajs)), 4) for f in families},
         "failure_counts": dict(Counter(t["failure_type"] for t in trajs if not t["pass"])),
         "cost_usd": round(sum(t.get("cost_usd", 0.0) for t in trajs), 6),
-        "latency_ms": int(sum(t.get("latency_ms", 0) for t in trajs) / total) if total else 0,
+        "latency_ms": int(sum(t.get("latency_ms", 0) for t in trajs) / runs) if runs else 0,
         "failures": [{k: t.get(k) for k in ("task_id", "question", "failure_type", "reason", "action",
                                             "generated_pipeline", "diagnosis", "tool_calls")}
-                     for t in trajs if not t["pass"]],
+                     for t in trajs
+                     if not t["pass"] and t["task_id"] not in seen and not seen.add(t["task_id"])],
     }

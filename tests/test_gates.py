@@ -29,10 +29,16 @@ def test_rejects_tiny_gain_with_big_cost():
     assert not verdict["accepted"] and not verdict["checks"]["cost_ok"]
 
 
-def test_big_gain_excuses_cost_increase():
-    parent = metrics(0.4, {"a": False}, cost=1.0)
-    child = metrics(0.6, {"a": True}, cost=2.0)
-    assert decide(parent, child)["accepted"]
+def test_big_gain_excuses_proportional_cost_increase():
+    parent = metrics(0.26, {"a": False}, cost=1.0)
+    assert decide(parent, metrics(0.33, {"a": True}, cost=1.71))["accepted"]  # +7pt buys +80%
+    assert not decide(parent, metrics(0.33, {"a": True}, cost=2.0))["accepted"]
+    assert not decide(parent, metrics(0.9, {"a": True}, cost=15.0))["accepted"]  # hard cap
+
+
+def test_regression_uses_majority_of_repeats():
+    parent = {"a": 1.0, "b": 0.67, "c": 0.33}
+    assert regression_rate(parent, {"a": 0.67, "b": 0.33, "c": 0.0}) == 0.5
 
 
 def test_rejects_regressions_and_no_gain():

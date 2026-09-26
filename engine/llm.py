@@ -53,6 +53,7 @@ def chat(model: str, messages: list[dict], temperature: float = 0.0, json_mode: 
          max_tokens: int = 1200) -> Completion:
     kwargs: dict[str, Any] = {
         "model": model, "messages": messages, "temperature": temperature, "max_tokens": max_tokens,
+        "seed": 7,
         "extra_body": {"usage": {"include": True}},
     }
     if json_mode:

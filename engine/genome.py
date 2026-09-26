@@ -19,6 +19,11 @@ EVOLVABLE_GUARDRAILS = (
 )
 ALL_TOOLS = ("get_schema", "sample_docs", "list_indexes", "explain_aggregate", "run_aggregate", "collection_stats")
 LOCKED_TOOLS = ("run_aggregate",)
+# Procedural guardrails bring the tool they enforce; a single mutation must be self-contained.
+GUARDRAIL_REQUIRES = {
+    "require_explain_before_diagnosis": "explain_aggregate",
+    "require_schema_before_query": "get_schema",
+}
 
 SETTABLE_PATHS: dict[str, tuple] = {
     "context.include_schema": (True, False),
@@ -102,6 +107,8 @@ def validate_patch(genome: dict, patch: Any) -> None:
             raise PatchError(f"unknown tool {value!r}")
         if op == "disable_tool" and value in LOCKED_TOOLS:
             raise PatchError(f"tool {value!r} is locked")
+        if op == "disable_tool" and any(GUARDRAIL_REQUIRES.get(gr) == value for gr in genome["guardrails"]):
+            raise PatchError(f"tool {value!r} is required by an enabled guardrail")
         present = value in genome["tools"]
         if (op == "enable_tool") == present:
             raise PatchError(f"tool {value!r} already {'enabled' if present else 'disabled'}")
@@ -122,6 +129,9 @@ def apply_patch(genome: dict, patch: dict) -> dict:
         child[section] = {**child[section], key: value}
     elif op == "enable_guardrail":
         child["guardrails"] = [*child["guardrails"], value]
+        needed = GUARDRAIL_REQUIRES.get(value)
+        if needed and needed not in child["tools"]:
+            child["tools"] = [*child["tools"], needed]
     elif op == "disable_guardrail":
         child["guardrails"] = [g for g in child["guardrails"] if g != value]
     elif op == "enable_tool":

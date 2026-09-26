@@ -16,7 +16,7 @@ from engine import config, db, gates, genome as genome_mod, memory, meta
 from engine.evaluate import HOLDOUT, evaluate
 
 log = logging.getLogger("harnessforge")
-PUBLIC_METRICS = ("accuracy", "passed", "total", "by_family", "failure_counts", "cost_usd", "latency_ms")
+PUBLIC_METRICS = ("accuracy", "passed", "total", "runs", "by_family", "failure_counts", "cost_usd", "latency_ms")
 
 
 def now() -> dt.datetime:

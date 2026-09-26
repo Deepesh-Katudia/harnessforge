@@ -66,3 +66,10 @@ def test_diff_lists_changes():
     parent = g.seed()
     child = g.apply_patch(parent, {"op": "set", "path": "routing.generator_model", "value": "STRONG"})
     assert g.diff(parent, child) == [{"path": "routing.generator_model", "before": "CHEAP", "after": "STRONG"}]
+
+
+def test_procedural_guardrail_brings_its_tool_and_protects_it():
+    child = g.apply_patch(g.seed(), {"op": "enable_guardrail", "value": "require_explain_before_diagnosis"})
+    assert "explain_aggregate" in child["tools"]
+    with pytest.raises(g.PatchError):
+        g.apply_patch(child, {"op": "disable_tool", "value": "explain_aggregate"})

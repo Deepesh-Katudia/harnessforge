@@ -28,6 +28,8 @@ Patch ops (JSON):
   {"op": "enable_guardrail" | "disable_guardrail", "value": <one of %(guardrails)s>}
   {"op": "enable_tool" | "disable_tool", "value": <one of %(tools)s>}
 Locked (cannot change): guardrails %(locked)s, tool run_aggregate.
+Procedural guardrails also enable the tool they enforce: %(requires)s.
+Note: the CHEAP model rarely calls optional tools on its own; procedural guardrails force it to.
 Model tiers: CHEAP (%(cheap)s, very low cost) and STRONG (%(strong)s, ~15x cost).
 
 Reply with JSON only:
@@ -41,6 +43,7 @@ def _system_prompt() -> str:
         "guardrails": list(genome_mod.EVOLVABLE_GUARDRAILS),
         "tools": list(genome_mod.ALL_TOOLS),
         "locked": list(genome_mod.LOCKED_GUARDRAILS),
+        "requires": json.dumps(genome_mod.GUARDRAIL_REQUIRES),
         "cheap": config.MODELS["CHEAP"], "strong": config.MODELS["STRONG"],
     }
 
@@ -87,7 +90,7 @@ def propose(genome: dict, train_metrics: dict, run_id: str, generation: int, his
                 {"role": "user", "content": build_context(genome, train_metrics, retrieved, lessons, history)}]
     cost, last_error = 0.0, None
     for _ in range(2):
-        comp = llm.chat(config.META_MODEL, messages, temperature=0.3, max_tokens=800)
+        comp = llm.chat(config.META_MODEL, messages, temperature=0.3, max_tokens=2500)
         cost += comp.cost_usd
         try:
             out = llm.parse_json(comp.text)
@@ -96,6 +99,7 @@ def propose(genome: dict, train_metrics: dict, run_id: str, generation: int, his
                     "dominant_failure": dominant, "retrieved": retrieved, "lessons_used": lessons}
         except (ValueError, genome_mod.PatchError) as exc:
             last_error = str(exc)
+            log.warning("meta-agent proposal invalid (%s); raw output: %s", exc, comp.text[:500])
             messages += [{"role": "assistant", "content": comp.text},
                          {"role": "user", "content": f"Invalid patch: {exc}. Propose a different, valid patch."}]
     return {"patch": None, "valid": False, "error": last_error, "meta_cost_usd": cost, "memory_query": query,

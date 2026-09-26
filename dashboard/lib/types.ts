@@ -21,6 +21,7 @@ export type Metrics = {
   accuracy: number;
   passed: number;
   total: number;
+  runs?: number;
   by_family: Record<string, number>;
   failure_counts: Record<string, number>;
   cost_usd: number;

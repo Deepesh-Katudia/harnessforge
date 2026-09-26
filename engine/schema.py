@@ -31,23 +31,37 @@ SCHEMAS: dict[str, dict[str, str]] = {
         "text": "string",
         "date": "date",
     },
-    "sales": {
-        "saleDate": "date",
-        "storeLocation": "string e.g. 'Denver', 'Seattle'",
-        "purchaseMethod": "string 'In store' | 'Online' | 'Phone'",
-        "couponUsed": "bool",
-        "customer.gender": "string 'M' | 'F'",
-        "customer.age": "int",
-        "customer.email": "string",
-        "customer.satisfaction": "int 1-5",
-        "items": "array<{name:string, tags:array<string>, price:Decimal128, quantity:int}>",
-        "items.name": "string",
-        "items.price": "Decimal128 (unit price)",
-        "items.quantity": "int",
+    "accounts": {
+        "account_id": "int",
+        "limit": "int credit limit",
+        "products": "array<string> e.g. ['Derivatives','InvestmentStock']",
+    },
+    "customers": {
+        "username": "string",
+        "name": "string",
+        "email": "string",
+        "birthdate": "date",
+        "active": "bool (often missing)",
+        "accounts": "array<int> account_id values -> accounts.account_id",
+        "tier_and_details": "object keyed by random ids: {<id>: {tier, benefits[], active}}",
+    },
+    "transactions": {
+        "account_id": "int -> accounts.account_id",
+        "transaction_count": "int",
+        "bucket_start_date": "date",
+        "bucket_end_date": "date",
+        "transactions": "array<{date, amount:int, transaction_code:'buy'|'sell', symbol:string, price, total}>",
+        "transactions.date": "date",
+        "transactions.amount": "int shares",
+        "transactions.transaction_code": "string 'buy' | 'sell'",
+        "transactions.symbol": "string ticker e.g. 'adbe'",
+        "transactions.price": "string-encoded decimal",
+        "transactions.total": "string-encoded decimal",
     },
 }
 
-LOCATIONS = {"movies": "sample_mflix.movies", "comments": "sample_mflix.comments", "sales": "sample_supplies.sales"}
+LOCATIONS = {"movies": "sample_mflix.movies", "comments": "sample_mflix.comments", "accounts": "sample_analytics.accounts",
+             "customers": "sample_analytics.customers", "transactions": "sample_analytics.transactions"}
 
 
 def known_paths(collection: str) -> set[str]:
