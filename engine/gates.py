@@ -5,8 +5,11 @@ from engine.config import GATES, Gates
 
 
 def regressions(parent_pass: dict[str, float], child_pass: dict[str, float]) -> tuple[list[str], int]:
-    """Tasks the parent passed by majority that the child now fails by majority, and the parent-pass count."""
-    parent_ok = [tid for tid, score in parent_pass.items() if float(score) > 0.5]
+    """Tasks the parent passed on EVERY repeat that the child now fails on most repeats.
+
+    Only stable passes are protected: a task the parent passed 2/3 times is a coin flip, not a capability.
+    """
+    parent_ok = [tid for tid, score in parent_pass.items() if float(score) >= 0.999]
     broken = [tid for tid in parent_ok if float(child_pass.get(tid, 0)) < 0.5]
     return broken, len(parent_ok)
 

@@ -8,6 +8,7 @@ evaluate child (train) -> gates -> if accepted: evaluate hidden holdout -> persi
 from __future__ import annotations
 
 import argparse
+import json
 import datetime as dt
 import logging
 import uuid
@@ -59,6 +60,19 @@ def _baseline(run_id: str) -> tuple[dict, dict, float]:
     return seed, train, train["cost_usd"] + holdout["cost_usd"]
 
 
+def _regression_evidence(verdict: dict, child_train: dict) -> list[dict]:
+    """What the child did wrong on TRAIN tasks the parent used to pass (lets the meta-agent learn from rejections)."""
+    by_task = {f["task_id"]: f for f in child_train["failures"]}
+    evidence = []
+    for tid in verdict.get("regressed_tasks", []):
+        f = by_task.get(tid)
+        if f:
+            output = f.get("generated_pipeline") or f.get("diagnosis") or f.get("action")
+            evidence.append({"question": f["question"], "failure_type": f.get("failure_type"),
+                             "why": (f.get("reason") or "")[:160], "child_output": json.dumps(output, default=str)[:240]})
+    return evidence
+
+
 def _generation(run_id: str, version: int, parent: dict, parent_version: int, parent_train: dict,
                 history: list[dict]) -> tuple[dict, dict, int, float]:
     """Run one generation. Returns (new_parent, new_parent_train, new_parent_version, cost)."""
@@ -94,7 +108,8 @@ def _generation(run_id: str, version: int, parent: dict, parent_version: int, pa
                   regression_rate=verdict["regression_rate"], cost_usd=child_train["cost_usd"],
                   latency_ms=child_train["latency_ms"], memory_evidence=evidence)
     history.append({"patch": patch, "accepted": verdict["accepted"],
-                    "train_accuracy": child_train["accuracy"], "checks": verdict["checks"]})
+                    "train_accuracy": child_train["accuracy"], "checks": verdict["checks"],
+                    "regressions": _regression_evidence(verdict, child_train)})
     if not verdict["accepted"]:
         _record_genome(run_id, version, parent_version, child, **fields)
         emit(run_id, "genome_rejected", version, f"REJECTED {genome_mod.describe_patch(patch)}", verdict=verdict)

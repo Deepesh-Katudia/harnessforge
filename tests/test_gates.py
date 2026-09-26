@@ -37,8 +37,8 @@ def test_big_gain_excuses_proportional_cost_increase():
 
 
 def test_regression_uses_majority_of_repeats():
-    parent = {"a": 1.0, "b": 0.67, "c": 0.33}
-    assert regression_rate(parent, {"a": 0.67, "b": 0.33, "c": 0.0}) == 0.5
+    parent = {"a": 1.0, "b": 1.0, "c": 0.67}
+    assert regression_rate(parent, {"a": 0.67, "b": 0.33, "c": 0.0}) == 0.5  # c was never stable
 
 
 def test_rejects_regressions_and_no_gain():

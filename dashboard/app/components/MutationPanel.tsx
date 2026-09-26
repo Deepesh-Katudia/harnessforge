@@ -2,7 +2,7 @@ import type { GenomeRecord } from "@/lib/types";
 
 const CHECK_LABELS: Record<string, string> = {
   accuracy_improved: "Child train accuracy > parent",
-  regression_ok: "Regressions ≤ max(1 task, 10%)",
+  regression_ok: "Stable passes lost ≤ max(1 task, 10%)",
   cost_ok: "Cost within budget (or big accuracy gain)",
   valid_patch: "Patch passes allowlist validation",
 };

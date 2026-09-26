@@ -4,12 +4,12 @@ from __future__ import annotations
 SCHEMAS: dict[str, dict[str, str]] = {
     "movies": {
         "title": "string",
-        "year": "int (a few legacy docs hold strings)",
+        "year": "int release year (compare with integers, e.g. 2010)",
         "released": "date",
         "runtime": "int minutes",
         "genres": "array<string> e.g. ['Comedy','Drama']",
-        "cast": "array<string> actor names",
-        "directors": "array<string>",
+        "cast": "array<string> actor names only (directors are NOT in cast)",
+        "directors": "array<string> director names, e.g. 'Christopher Nolan'",
         "writers": "array<string>",
         "countries": "array<string>",
         "languages": "array<string>",
