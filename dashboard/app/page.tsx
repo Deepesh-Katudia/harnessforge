@@ -42,7 +42,10 @@ function Hero({ genomes }: { genomes: GenomeRecord[] }) {
   const gen0 = genomes.find((g) => g.version === 0);
   const best = accepted[accepted.length - 1];
   const rejected = genomes.filter((g) => !g.accepted).length;
-  const costPerTask = (g?: GenomeRecord) => (g?.cost_usd !== undefined && g.train?.total ? g.cost_usd / g.train.total : undefined);
+  const costPerTask = (g?: GenomeRecord) => {
+    const n = g?.train?.runs ?? g?.train?.total;
+    return g?.cost_usd !== undefined && n ? g.cost_usd / n : undefined;
+  };
   return (
     <section className="hero">
       <div className="stat primary">
