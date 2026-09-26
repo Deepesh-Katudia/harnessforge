@@ -125,18 +125,42 @@ def _generation(run_id: str, version: int, parent: dict, parent_version: int, pa
     return child, child_train, version, cost
 
 
-def run(generations: int, reset: bool) -> str:
-    db.bootstrap()
-    if reset:
-        db.reset_run_data()
-    db.wait_for_vector_indexes()
+def _start_run(generations: int) -> tuple[str, dict, dict, int, int, float, list[dict]]:
     run_id = uuid.uuid4().hex[:10]
     db.hf().runs.insert_one({"run_id": run_id, "started_at": now(), "status": "running",
                              "generations": generations, "models": config.MODELS, "meta_model": config.META_MODEL,
                              "gates": config.GATES.__dict__})
     parent, parent_train, spent = _baseline(run_id)
-    parent_version, history = 0, []
-    for version in range(1, generations + 1):
+    return run_id, parent, parent_train, 0, 1, spent, []
+
+
+def _resume_run(run_id: str, generations: int) -> tuple[str, dict, dict, int, int, float, list[dict]]:
+    """Rebuild evolution state from Atlas after a crash: MongoDB is the durable memory of the run."""
+    docs = list(db.hf().genomes.find({"run_id": run_id}, {"_id": 0}).sort("version", 1))
+    if not docs:
+        raise SystemExit(f"no genomes recorded for run {run_id}")
+    champion = [d for d in docs if d["accepted"]][-1]
+    spent = sum(d.get("cost_usd", 0.0) + (d.get("holdout") or {}).get("cost_usd", 0.0) for d in docs)
+    history = [{"patch": d.get("patch"), "accepted": d["accepted"], "train_accuracy": d.get("train_accuracy"),
+                "checks": (d.get("verdict") or {}).get("checks")} for d in docs if d["version"] > 0]
+    db.hf().runs.update_one({"run_id": run_id}, {"$set": {"status": "running", "generations": generations}})
+    emit(run_id, "run_resumed", champion["version"],
+         f"resumed from Atlas at Gen {champion['version']} after {len(docs) - 1} recorded candidates")
+    # pass maps and failure details aren't persisted on genome docs, so re-measure the champion on train
+    parent_train = evaluate(champion["genome"], "train", run_id, champion["version"], role="parent_reeval")
+    return run_id, champion["genome"], parent_train, champion["version"], docs[-1]["version"] + 1, spent, history
+
+
+def run(generations: int, reset: bool, resume: str | None = None) -> str:
+    db.bootstrap()
+    if reset and not resume:
+        db.reset_run_data()
+    db.wait_for_vector_indexes()
+    from engine.evaluate import load_tasks
+    memory.warm_queries([t["question"] for t in load_tasks()])
+    state = _resume_run(resume, generations) if resume else _start_run(generations)
+    run_id, parent, parent_train, parent_version, first_version, spent, history = state
+    for version in range(first_version, generations + 1):
         if spent >= config.MAX_RUN_USD:
             emit(run_id, "budget_exhausted", version, f"spent ${spent:.2f} >= ${config.MAX_RUN_USD:.2f}")
             break
@@ -154,10 +178,11 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Evolve the HarnessForge agent harness")
     parser.add_argument("--generations", type=int, default=6)
     parser.add_argument("--reset", action="store_true", help="clear previous HarnessForge records first")
+    parser.add_argument("--resume", metavar="RUN_ID", help="continue a crashed run from its last accepted genome")
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s", datefmt="%H:%M:%S")
     logging.getLogger("httpx").setLevel(logging.WARNING)
-    print(f"run_id={run(args.generations, args.reset)}")
+    print(f"run_id={run(args.generations, args.reset, args.resume)}")
 
 
 if __name__ == "__main__":
