@@ -12,6 +12,8 @@ from engine import guardrails as gr
     [{"$match": {"$where": "true"}}],
     [{"$facet": {"a": [{"$out": "x"}]}}],
     [{"$lookup": {"from": "movies", "pipeline": [{"$merge": {"into": "y"}}], "as": "z"}}],
+    [{"$match": {"year": {"$lt": 1950}}}, {"$delete": {}}],
+    [{"$drop": "comments"}],
 ])
 def test_blocked_stages_rejected_even_when_nested(pipeline):
     res = gr.check_pipeline("movies", pipeline, g.seed())

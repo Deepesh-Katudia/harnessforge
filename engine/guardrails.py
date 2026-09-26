@@ -15,6 +15,9 @@ from engine import config
 BLOCKED_STAGES = frozenset({
     "$out", "$merge", "$function", "$accumulator", "$where",
     "$currentOp", "$listSessions", "$listLocalSessions", "$planCacheStats",
+    # not real aggregation stages, but a model emitting them is attempting a write
+    "$delete", "$deleteOne", "$deleteMany", "$remove", "$update", "$updateOne", "$updateMany",
+    "$insert", "$insertOne", "$insertMany", "$drop", "$dropCollection", "$createIndex", "$rename",
 })
 SUBPIPELINE_KEYS = ("pipeline",)
 
